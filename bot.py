@@ -19,7 +19,6 @@ async def handle_form_submission(request):
         
         # Format the message
         message = f"""📝 **New Form Submission**
-
 Name: {data.get('name', 'N/A')}
 Email: {data.get('email', 'N/A')}
 Phone: {data.get('phone', 'N/A')}
@@ -36,11 +35,40 @@ Date of Birth: {data.get('dob', 'N/A')}"""
 async def health_check(request):
     return web.json_response({"status": "ok"})
 
+async def options_handler(request):
+    """Handle CORS preflight requests"""
+    return web.Response(
+        status=200,
+        headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+    )
+
+def add_cors_headers(response):
+    """Add CORS headers to response"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 async def start_http_server():
     """Start HTTP server"""
     web_app = web.Application()
     web_app.router.add_post('/submit', handle_form_submission)
+    web_app.router.add_options('/submit', options_handler)
     web_app.router.add_get('/', health_check)
+    
+    # Add CORS middleware
+    @web.middleware
+    async def cors_middleware(request, handler):
+        if request.method == 'OPTIONS':
+            return await options_handler(request)
+        response = await handler(request)
+        return add_cors_headers(response)
+    
+    web_app.middlewares.append(cors_middleware)
     
     runner = web.AppRunner(web_app)
     await runner.setup()
