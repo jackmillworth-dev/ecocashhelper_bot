@@ -7,7 +7,6 @@ from aiohttp import web
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 USER_ID = os.environ.get("TELEGRAM_USER_ID")
 
-# Store app reference globally
 bot_app = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -27,19 +26,18 @@ Phone: {data.get('phone', 'N/A')}
 Date of Birth: {data.get('dob', 'N/A')}"""
         
         # Send message via bot
-        await bot_app.bot.send_message(chat_id=USER_ID, text=message)
+        await bot_app.bot.send_message(chat_id=int(USER_ID), text=message)
         
-        return web.json_response({"success": True, "message": "Form submitted successfully"})
+        return web.json_response({"success": True})
     except Exception as e:
         print(f"Error: {e}")
         return web.json_response({"success": False, "error": str(e)}, status=400)
 
 async def health_check(request):
-    """Health check endpoint"""
     return web.json_response({"status": "ok"})
 
-async def start_http_server(app):
-    """Start HTTP server alongside bot polling"""
+async def start_http_server():
+    """Start HTTP server"""
     web_app = web.Application()
     web_app.router.add_post('/submit', handle_form_submission)
     web_app.router.add_get('/', health_check)
@@ -53,14 +51,22 @@ async def start_http_server(app):
 async def main():
     global bot_app
     
-    # Create bot application
+    if not TOKEN:
+        print("ERROR: TELEGRAM_BOT_TOKEN not set")
+        return
+    
+    if not USER_ID:
+        print("ERROR: TELEGRAM_USER_ID not set")
+        return
+    
+    # Create bot
     bot_app = Application.builder().token(TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     
-    # Start HTTP server
-    asyncio.create_task(start_http_server(bot_app))
+    # Start HTTP server in background
+    asyncio.create_task(start_http_server())
     
-    print("Bot starting polling...")
+    print("Bot starting...")
     await bot_app.initialize()
     await bot_app.start()
     await bot_app.updater.start_polling()
